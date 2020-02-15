@@ -39,6 +39,7 @@ import subprocess as sp
 from time import sleep
 import yaml
 import threading
+import jack
 
 UHOME = os.path.expanduser("~")
 BDIR  = f'{UHOME}/pe.audio.sys'
@@ -47,6 +48,28 @@ with open( f'{BDIR}/config.yml', 'r' ) as f:
     CONFIG = yaml.load(f)
 LOUDSPEAKER     = CONFIG['loudspeaker']
 LSPK_FOLDER     = f'{BDIR}/loudspeakers/{LOUDSPEAKER}'
+
+def loop_pnames():
+    """ loopback port names needed for pre_in and some sources
+    """
+    # Always 'pre_in_loop' will be the alias for loopback 1 & 2 port names
+    pnames = ['pre_in_loop']
+    for source in CONFIG['sources']:
+        pname = CONFIG['sources'][source]['capture_port']
+        if 'loop' in pname:
+            pnames.append(pname)
+    return pnames
+
+def prepare_loopback_aliases():
+    JCLI = jack.Client('tmp', no_start_server=True)
+    l = 1
+    for pname in loop_pnames():
+        for i in (1,2):
+            p = JCLI.get_port_by_name( f'loopback:capture_{l}' )
+            p.set_alias( f'{pname}:output_{i}' )
+            p = JCLI.get_port_by_name( f'loopback:playback_{l}' )
+            p.set_alias( f'{pname}:input_{i}' )
+            l += 1
 
 def is_jack_running():
     try:
@@ -57,10 +80,12 @@ def is_jack_running():
 
 def start_jackd():
 
-    jack_backend_options = CONFIG["jack_backend_options"].replace(
-                            '$system_card', CONFIG["system_card"] )
+    jack_backend_options = CONFIG["jack_backend_options"] \
+                            .replace('$system_card', CONFIG["system_card"] )
 
-    tmplist = ['jackd'] + f'{CONFIG["jack_options"]}'.split() + \
+    # jackd -Ln will provide n loopback ports as needed
+    L = str( len(loop_pnames() * 2 ) )
+    tmplist = ['jackd'] + f'-L{L} {CONFIG["jack_options"]}'.split() + \
               f'{jack_backend_options}'.split() + \
               '>/dev/null 2>&1'.split()
     #print( ' '.join(tmplist) ) ; sys.exit() # DEBUG
@@ -253,10 +278,10 @@ if __name__ == "__main__":
     # Lets backup .state.yml to help us if it get damaged.
     check_state_file()
 
-    # KILLING ANY PREVIOUS INSTANCE OF THIS
+    # Killing any previous instance of this
     kill_bill()
 
-    # READING OPTIONS FROM COMMAND LINE
+    # Reading options from command line
     run_level = ''
     if sys.argv[1:]:
 
@@ -286,11 +311,17 @@ if __name__ == "__main__":
     if is_jack_running():
 
         # (i) Importing core.py needs JACK to be running
-        from share.core import  jack_loops_prepare,     \
-                                init_audio_settings,    \
+        from share.core import  init_audio_settings,    \
                                 init_source,            \
                                 jack_connect_bypattern, \
                                 save_yaml, STATE_PATH
+
+        # PREAMP INPUTS (JACK LOOPS)
+        prepare_loopback_aliases()
+        sleep(.5)
+
+        # Running USER SCRIPTS
+        run_scripts()
 
         # BRUTEFIR
         start_brutefir()
@@ -298,18 +329,9 @@ if __name__ == "__main__":
         # ADDIGN EXTRA SOUND CARDS RESAMPLED INTO JACK
         prepare_extra_cards()
 
-        # PREAMP INPUTS (JACK LOOPS)
-        if run_level == 'all':
-            jack_loops_prepare()
-            sleep(1) # this is necessary, or checking for ports to be activated
-
         # PREAMP    -->   BRUTEFIR  (be careful that both pre_in_loops are alive)
-        # (i) Threading this: it depends on Brutefir ports to become active
-        job_pre2bfir = threading.Thread( target=jack_connect_bypattern,
-                                         args=('pre_in_loop',
-                                               'brutefir',
-                                               'connect',60))
-        job_pre2bfir.start()
+        # Wait 60 sec because Brutefir ports can take some time to be activated.
+        jack_connect_bypattern('pre_in_loop', 'brutefir', wait=60)
 
         # PREAMP    --> MONITORS
         if CONFIG["source_monitors"]:
@@ -332,9 +354,6 @@ if __name__ == "__main__":
         svcs.remove('aux')
         for svc in svcs:
             restart_service( svc )
-
-        # Running USER SCRIPTS
-        run_scripts()
 
         # Some sources depends on scripts to launch ports in Jack, so we need
         # to sleep a bit then retry to connect its ports to the preamp
