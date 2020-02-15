@@ -17,11 +17,11 @@
 # along with 'pe.audio.sys'.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-    Measures EBU R128 (I)ntegrated Loudness on runtime from an audio 
+    Measures EBU R128 (I)ntegrated Loudness on runtime from an audio
     sound device.
 
     Will write it to an --output_file
-    
+
     You can reset the current (I) by writing 'reset' into --control-file
 """
 # Thanks to https://python-sounddevice.readthedocs.io
@@ -140,7 +140,7 @@ class Changed_files_handler(FileSystemEventHandler):
                     if cmd.startswith('reset'):
                         reset = True
 
-    
+
 if __name__ == '__main__':
 
     # The accumulated (I) can be RESET on the fly:
@@ -165,12 +165,12 @@ if __name__ == '__main__':
 
     # Reading command line args
     args = parse_cmdline()
-    
+
     # Setting parameters
     fs = sd.query_devices(args.input_device, 'input')['default_samplerate']
     # 100ms block size
     BS = int( fs * 0.100 )
-    
+
     # precalculating coeffs for scipy.lfilter
     hpf_coeffs =    get_coeffs(fs, 100,  .707, 'hpf'            )
     hshelf_coeffs = get_coeffs(fs, 1000, .707, 'highshelf', 4.0 )
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # Main loop: open a capture stream that process 100ms audio blocks
     ##################################################################
     print('(loudness_monitor) Start monitoring')
-    with sd.InputStream( device=args.input_device, 
+    with sd.InputStream( device=args.input_device,
                           callback=callback,
                           blocksize  = BS,
                           samplerate = fs,
@@ -198,7 +198,7 @@ if __name__ == '__main__':
                           dither_off = True):
 
         while True:
-            
+
             # Reading captured 100 ms (b)locks:
             b100 = qIn.get()
 
@@ -209,25 +209,25 @@ if __name__ == '__main__':
             # Sliding the 400ms (w)indow
             w400[ : BS*3 ] = w400[ BS : ]
             w400[ BS*3 : ] = f100
-        
+
             # Mean square calculation for 400ms audio blocks
             msqL = np.sum( np.square( w400[:,0] ) ) / (fs * 0.4)
             msqR = np.sum( np.square( w400[:,1] ) ) / (fs * 0.4)
-            
+
             # Stereo (M)omentary Loudness
             if msqL or msqR: # avoid log10(0)
                 M = -0.691 + 10 * np.log10 (msqL + msqR)
-            
+
             # Dual gatting to compute (I)ntegrated Loudness.
             if M > -70.0:
                 # cumulative moving average
                 G1 += 1
                 G1mean = G1mean + (M - G1mean) / G1
-                
+
             if M > (G1mean - 10.0):
                 G2 += 1
                 I = G1mean + (M - G1mean) / G2
-            
+
             # Converting FS (Full Scale) to LU (Loudness Units) ref to -23dBFS
             M_LU = M - -23.0
             I_LU = I - -23.0
@@ -240,7 +240,7 @@ if __name__ == '__main__':
                     fout.write( str( round(I_LU,0) ) )
                     fout.close()
                 Iprev = I
-            
+
             # Reseting the (I) measurement. <reset> is a global that can
             # be modified on the fly.
             if reset:
