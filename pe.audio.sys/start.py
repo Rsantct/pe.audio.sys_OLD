@@ -211,7 +211,7 @@ def run_scripts(mode='start'):
         sleep(.5) # this is necessary because of asyncronous stopping
 
 def kill_bill():
-    """ killing any previous instance of this, becasue
+    """ killing any hung previous instance of this, becasue
         some residual try can be alive accidentaly.
     """
 
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     # Lets backup .state.yml to help us if it get damaged.
     check_state_file()
 
-    # Killing any previous instance of this
+    # Killing any previous hung instance of this
     kill_bill()
 
     # Reading options from command line
