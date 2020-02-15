@@ -406,27 +406,22 @@ def jack_connect_bypattern(cap_pattern, pbk_pattern, mode='connect', wait=1):
 
 def jack_clear_preamp():
     """ Force clearing ANY clients, no matter what input was selected """
+    # NOTICE: 'pre_in_loop' is an alias for 'loopback 1&2' jack port names.
+    pre1 = JCLI.get_port_by_name('loopback:playback_1')
+    pre2 = JCLI.get_port_by_name('loopback:playback_2')
+    for preport in (pre1, pre2):
+        for client in JCLI.get_all_connections( preport ):
+            jack_connect( client, preport, mode='off' )
 
-    preamp_ports = JCLI.get_ports('pre_in_loop', is_input=True)
-    for preamp_port in preamp_ports:
-        for client in JCLI.get_all_connections(preamp_port):
-            jack_connect( client, preamp_port, mode='off' )
-
-def jack_loops_prepare():
-    """ The preamp will have the courtesy of preparing the loops
-        as per indicated under the config sources section.
-        Also a preamp_loop will be spawned.
-    """
-    # 1st loop to prepare: auto spawn the preamp ports
-    jloop = threading.Thread(   target = jack_loop,
-                                args=['pre_in_loop', 2]   )
-    jloop.start()
-    # 2nd: the source's connection loops:
-    for source in CONFIG['sources']:
-        pname = CONFIG['sources'][source]['capture_port']
-        if 'loop' in pname:
-            jloop = threading.Thread( target = jack_loop, args=(pname,) )
-            jloop.start()
+def jack_prepare_loopback_aliases(loop_pnames):
+    l = 1
+    for pname in loop_pnames:
+        for i in (1,2):
+            p = JCLI.get_port_by_name( f'loopback:capture_{l}' )
+            p.set_alias( f'{pname}:output_{i}' )
+            p = JCLI.get_port_by_name( f'loopback:playback_{l}' )
+            p.set_alias( f'{pname}:input_{i}' )
+            l += 1
 
 
 # THE PREAMP: AUDIO PROCESSOR, SELECTOR, and SYSTEM STATE KEEPER ===============
