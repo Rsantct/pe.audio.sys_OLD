@@ -60,17 +60,6 @@ def loop_pnames():
             pnames.append(pname)
     return pnames
 
-def prepare_loopback_aliases():
-    JCLI = jack.Client('tmp', no_start_server=True)
-    l = 1
-    for pname in loop_pnames():
-        for i in (1,2):
-            p = JCLI.get_port_by_name( f'loopback:capture_{l}' )
-            p.set_alias( f'{pname}:output_{i}' )
-            p = JCLI.get_port_by_name( f'loopback:playback_{l}' )
-            p.set_alias( f'{pname}:input_{i}' )
-            l += 1
-
 def is_jack_running():
     try:
         sp.check_output( 'jack_lsp' )
@@ -311,13 +300,14 @@ if __name__ == "__main__":
     if is_jack_running():
 
         # (i) Importing core.py needs JACK to be running
-        from share.core import  init_audio_settings,    \
-                                init_source,            \
-                                jack_connect_bypattern, \
+        from share.core import  jack_prepare_loopback_aliases,  \
+                                init_audio_settings,            \
+                                init_source,                    \
+                                jack_connect_bypattern,         \
                                 save_yaml, STATE_PATH
 
         # PREAMP INPUTS (JACK LOOPS)
-        prepare_loopback_aliases()
+        jack_prepare_loopback_aliases( loop_pnames() )
         sleep(.5)
 
         # Running USER SCRIPTS
