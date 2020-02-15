@@ -344,63 +344,10 @@ def brutefir_runs():
 
 # JACK MANAGEMENT: =============================================================
 
-def jack_loop(clientname, nports=2):
-    """ Creates a jack loop with given 'clientname'
-        NOTICE: this process will keep running until broken,
-                so if necessary you'll need to thread this when calling here.
-    """
-    # CREDITS:  https://jackclient-python.readthedocs.io/en/0.4.5/examples.html
-
-    # The jack module instance for our looping ports
-    client = jack.Client(name=clientname, no_start_server=True)
-
-    if client.status.name_not_unique:
-        client.close()
-        print( f'(core.jack_loop) \'{clientname}\' already exists in JACK, nothing done.' )
-        return
-
-    # Will use the threading.Event mechanism to keep this alive
-    event = threading.Event()
-
-    # This sets the actual loop that copies frames from our capture to our playback ports
-    @client.set_process_callback
-    def process(frames):
-        assert len(client.inports) == len(client.outports)
-        assert frames == client.blocksize
-        for i, o in zip(client.inports, client.outports):
-            o.get_buffer()[:] = i.get_buffer()
-
-    # If jack shutdowns, will trigger on 'event' so that the below 'whith client' will break.
-    @client.set_shutdown_callback
-    def shutdown(status, reason):
-        print('(core.jack_loop) JACK shutdown!')
-        print('(core.jack_loop) JACK status:', status)
-        print('(core.jack_loop) JACK reason:', reason)
-        # This triggers an event so that the below 'with client' will terminate
-        event.set()
-
-    # Create the ports
-    for n in range( nports ):
-        client.inports.register(f'input_{n+1}')
-        client.outports.register(f'output_{n+1}')
-    # client.activate() not needed, see below
-
-    # This is the keeping trick
-    with client:
-        # When entering this with-statement, client.activate() is called.
-        # This tells the JACK server that we are ready to roll.
-        # Our above process() callback will start running now.
-
-        print( f'(core.jack_loop) running {clientname}' )
-        try:
-            event.wait()
-        except KeyboardInterrupt:
-            print('\n(core.jack_loop) Interrupted by user')
-        except:
-            print('\n(core.jack_loop)  Terminated')
-
 def jack_connect(p1, p2, mode='connect', wait=1):
-    """ Low level tool to connect / disconnect a pair of ports, by retriyng for a while """
+    """ Low level tool to connect / disconnect a pair of ports,
+        by retriyng for a while
+    """
     # Will retry during <wait> seconds, this is useful when a
     # jack port exists but it is still not active,
     # for instance Brutefir ports takes some seconds to be active.
@@ -413,21 +360,38 @@ def jack_connect(p1, p2, mode='connect', wait=1):
                 if not p2 in JCLI.get_all_connections(p1):
                     JCLI.connect(p1, p2)
                 else:
-                    print ( f'(core) {p1.name} already connected to {p2.name}' )
+                    print ( f'(core) {p1.name} already connected to {p2.name}')
+            print()
             return True
         except:
             c -= 1
-            print ( f'(core) waiting {str(c)}s for \'{p1.name}\' \'{p2.name}\' to be active' )
             sleep(1)
+    print ( f'(core) failed to connect \'{p1.name}\' to \'{p2.name}\'')
     return False
 
 def jack_connect_bypattern(cap_pattern, pbk_pattern, mode='connect', wait=1):
-    """ High level tool to connect/disconnect a given port name patterns """
+    """ High level tool to connect/disconnect a given port name patterns
+    """
+    # Try to get ports by a port name pattern
     cap_ports = JCLI.get_ports( cap_pattern, is_output=True )
     pbk_ports = JCLI.get_ports( pbk_pattern, is_input= True )
+    # If not found, it can be an alias pattern (loopback ports
+    # have alias as expected from some source names)
+    if not cap_ports:
+        loopback_cap_ports = JCLI.get_ports( 'loopback', is_output=True )
+        for p in loopback_cap_ports:
+            # A port can have 2 alias, our user defined alias is the 2nd one.
+            if cap_pattern in p.aliases[1]:
+                cap_ports.append(p)
+    if not pbk_ports:
+        loopback_pbk_ports = JCLI.get_ports( 'loopback', is_input=True )
+        for p in loopback_pbk_ports:
+            if pbk_pattern in p.aliases[1]:
+                pbk_ports.append(p)
     #print('CAPTURE  ====> ', cap_ports) # debug
     #print('PLAYBACK ====> ', pbk_ports) # debug
     if not cap_ports or not pbk_ports:
+        print( f'(core) cannot connect "{cap_pattern}" to "{pbk_pattern}"' )
         return
     mode = 'disconnect' if ('dis' in mode or 'off' in mode) else 'connect'
     i=0
