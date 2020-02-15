@@ -36,10 +36,12 @@ def start():
     # do create the auxiliary loudness monitor control file
     with open(CTRLFNAME, 'w') as f:
         f.write('')
-        
+
+    # Will get 'pre_in_loop' as the input_device to sounddevice, but notice that
+    # 'pre_in_loop' is a jack port alias for the 1&2 'loopback' jack port names.
     cmd = f'{MAINFOLDER}/share/scripts/loudness_monitor/' \
             'loudness_monitor_daemon.py' \
-           f' --input_device pre_in_loop' \
+           f' --input_device loopback' \
            f' --control_file  {CTRLFNAME} ' \
            f' --output_file {MAINFOLDER}/.loudness_monitor'
 
@@ -49,7 +51,7 @@ def start():
 def stop():
     Popen( 'pkill -f loudness_monitor_daemon.py'.split() )
 
-    
+
 if sys.argv[1:]:
     try:
         option = {
