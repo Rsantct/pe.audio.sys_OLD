@@ -46,7 +46,7 @@ def start():
            f' --output_file {MAINFOLDER}/.loudness_monitor'
 
     Popen( cmd.split() )
-    print(f'(loudness_monitor) spawned PortAudio ports in JACK')
+    print(f'(loudness_monitor) will spawn PortAudio ports in JACK')
 
 def stop():
     Popen( 'pkill -f loudness_monitor_daemon.py'.split() )
