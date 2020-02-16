@@ -251,7 +251,7 @@ Here you are an uncommented bare example of `config.yml`:
             gain:           0.0
             xo:             mp
         istreams:
-            capture_port:   istreams_loop
+            capture_port:   mplayer_istreams
             gain:           0.0
             xo:             mp
         salon:
