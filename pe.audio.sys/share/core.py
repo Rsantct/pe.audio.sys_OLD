@@ -740,7 +740,7 @@ class Preamp(object):
                 xo = CONFIG["sources"][source]['xo']
                 if c.set_xo( xo ) == 'done':
                     self.state['xo_set'] = xo
-                else:
+                elif xo:
                     tmp = f'\'xo:{xo}\' in \'{source}\' is not valid'
                     print('(core)', tmp)
             except:
@@ -749,7 +749,7 @@ class Preamp(object):
                 drc = CONFIG["sources"][source]['drc']
                 if c.set_drc( drc ) == 'done':
                     self.state['drc_set'] = drc
-                else:
+                elif drc:
                     tmp += f'\'drc:{xo}\' in \'{source}\' is not valid'
                     print('(core)', tmp)
             except:
