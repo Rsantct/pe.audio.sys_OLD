@@ -323,11 +323,6 @@ if __name__ == "__main__":
         # Wait 60 sec because Brutefir ports can take some time to be activated.
         jack_connect_bypattern('pre_in_loop', 'brutefir', wait=60)
 
-        # PREAMP    --> MONITORS
-        if CONFIG["source_monitors"]:
-            for monitor in CONFIG["source_monitors"]:
-                jack_connect_bypattern( 'pre_in_loop', monitor )
-
         # RESTORE: audio settings
         state = init_audio_settings()
         save_yaml(state, STATE_PATH)
@@ -350,6 +345,11 @@ if __name__ == "__main__":
         sleep(3)
         sp.Popen( f'{UHOME}/bin/peaudiosys_control input {state["input"]}'.split() )
 
+        # PREAMP    --> MONITORS
+        sleep(3) # Needs to check if monitors ports are created, or simply wait a bit.
+        if CONFIG["source_monitors"]:
+            for monitor in CONFIG["source_monitors"]:
+                jack_connect_bypattern( 'pre_in_loop', monitor, wait=10 )
 
     else:
         print( '(start.py) JACK not detected')
