@@ -1,3 +1,6 @@
+# This project has been MIGRATED to AudioHumLab gitsite
+# https://github.com/AudioHumLab/pe.audio.sys
+
 # Credits
 
 This is based on the former **FIRtro** and the current **pre.di.c** projects, as PC based digital preamplifier and crossover projects, designed by the pioneer **@rripio** and later alongside others contributors.
